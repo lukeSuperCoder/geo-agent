@@ -1,5 +1,6 @@
 """
 WebSocket API处理模块
+支持流式聊天和地图联动
 """
 import json
 import uuid
@@ -9,6 +10,7 @@ from loguru import logger
 
 from app.models.message import UserMessage, MessageType
 from app.services.chat_service import chat_service
+from app.services.stream_chat_service import stream_chat_service
 
 
 class WebSocketManager:
@@ -91,8 +93,15 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = None):
                         connection_id = cid
                         break
                 
-                # 处理用户消息
-                if message_data.get("type") == "user_input":
+                # 处理不同类型的消息
+                message_type = message_data.get("type", "")
+                
+                if message_type == "chat":
+                    # 流式聊天消息
+                    await handle_stream_chat(websocket, message_data, session_id)
+                    
+                elif message_type == "user_input":
+                    # 传统意图解析消息
                     user_message = UserMessage(
                         message=message_data["message"],
                         session_id=session_id
@@ -116,4 +125,29 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = None):
         logger.error(f"WebSocket处理错误: {str(e)}")
     finally:
         if connection_id:
-            websocket_manager.disconnect(connection_id, session_id) 
+            websocket_manager.disconnect(connection_id, session_id)
+
+
+async def handle_stream_chat(websocket: WebSocket, message_data: dict, session_id: str):
+    """处理流式聊天消息"""
+    try:
+        message = message_data.get("message", "")
+        if not message:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "error": "消息内容不能为空",
+                "session_id": session_id
+            }))
+            return
+        
+        # 调用流式聊天服务
+        async for response in stream_chat_service.stream_chat(message, session_id):
+            await websocket.send_text(json.dumps(response))
+            
+    except Exception as e:
+        logger.error(f"流式聊天处理失败: {str(e)}")
+        await websocket.send_text(json.dumps({
+            "type": "error",
+            "error": f"聊天服务出错: {str(e)}",
+            "session_id": session_id
+        })) 

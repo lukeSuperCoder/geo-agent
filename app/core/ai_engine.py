@@ -1,8 +1,11 @@
 """
 AI引擎模块 - 负责意图解析和自然语言理解
+支持多种AI模型：OpenAI、Qwen-Flash等
 """
 import json
+import httpx
 from typing import Dict, Any, Optional
+from abc import abstractmethod
 from openai import OpenAI
 from loguru import logger
 
@@ -10,12 +13,85 @@ from app.config import settings
 from app.models.message import IntentResult, IntentType
 
 
+class BaseAIProvider:
+    """AI提供商基类"""
+    
+    @abstractmethod
+    async def call_model(self, prompt: str, system_prompt: str = None) -> str:
+        """调用AI模型"""
+        pass
+
+
+class OpenAIProvider(BaseAIProvider):
+    """OpenAI提供商"""
+    
+    def __init__(self):
+        self.client = OpenAI(
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url
+        )
+        self.model = settings.openai_model
+    
+    async def call_model(self, prompt: str, system_prompt: str = None) -> str:
+        """调用OpenAI模型"""
+        try:
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=500
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            logger.error(f"OpenAI API调用失败: {str(e)}")
+            raise
+
+
+class QwenProvider(BaseAIProvider):
+    """Qwen提供商"""
+    
+    def __init__(self):
+        self.api_key = settings.qwen_api_key
+        self.model = settings.qwen_model
+        self.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        
+        # 初始化OpenAI客户端
+        self.client = OpenAI(
+            api_key=self.api_key,
+            base_url=self.base_url
+        )
+    
+    async def call_model(self, prompt: str, system_prompt: str = None) -> str:
+        """调用Qwen模型"""
+        try:
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+            
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.1,
+                max_tokens=500
+            )
+            return response.choices[0].message.content
+                
+        except Exception as e:
+            logger.error(f"Qwen API调用失败: {str(e)}")
+            raise
+
+
 class AIEngine:
     """AI意图解析引擎"""
     
     def __init__(self):
-        self.client = OpenAI(api_key=settings.openai_api_key)
-        self.model = settings.openai_model
+        self.provider = self._get_provider()
         
         # 意图解析的Prompt模板
         self.intent_prompt = """
@@ -45,7 +121,24 @@ class AIEngine:
 
 请返回JSON格式的解析结果：
 """
-
+        
+        self.system_prompt = "你是一个专业的地理信息助手，请严格按照JSON格式返回结果。"
+    
+    def _get_provider(self) -> BaseAIProvider:
+        """获取AI提供商"""
+        if settings.ai_provider.lower() == "qwen":
+            if not settings.qwen_api_key:
+                raise ValueError("Qwen API Key未配置")
+            logger.info("使用Qwen-Flash模型")
+            return QwenProvider()
+        elif settings.ai_provider.lower() == "openai":
+            if not settings.openai_api_key:
+                raise ValueError("OpenAI API Key未配置")
+            logger.info("使用OpenAI模型")
+            return OpenAIProvider()
+        else:
+            raise ValueError(f"不支持的AI提供商: {settings.ai_provider}")
+    
     async def parse_intent(self, user_input: str, session_id: str) -> IntentResult:
         """解析用户意图"""
         try:
@@ -54,8 +147,8 @@ class AIEngine:
             # 构建完整的Prompt
             full_prompt = self.intent_prompt.format(user_input=user_input)
             
-            # 调用OpenAI API
-            response = await self._call_openai(full_prompt)
+            # 调用AI模型
+            response = await self.provider.call_model(full_prompt, self.system_prompt)
             
             # 解析响应
             intent_data = self._parse_response(response)
@@ -83,25 +176,8 @@ class AIEngine:
                 session_id=session_id
             )
     
-    async def _call_openai(self, prompt: str) -> str:
-        """调用OpenAI API"""
-        try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "你是一个专业的地理信息助手，请严格按照JSON格式返回结果。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,
-                max_tokens=500
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            logger.error(f"OpenAI API调用失败: {str(e)}")
-            raise
-    
     def _parse_response(self, response: str) -> Dict[str, Any]:
-        """解析OpenAI响应"""
+        """解析AI响应"""
         try:
             # 尝试提取JSON部分
             start_idx = response.find('{')

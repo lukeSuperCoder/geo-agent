@@ -1,5 +1,6 @@
 """
 聊天服务 - 负责处理用户消息和协调各个组件
+专注于意图解析和地图联动
 """
 import json
 from typing import Dict, Any, List
