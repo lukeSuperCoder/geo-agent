@@ -11,6 +11,7 @@ from app.config import settings
 from app.utils.logger import setup_logger
 from app.api.websocket import websocket_endpoint
 from app.api.chat import router as chat_router
+from app.api.pages import router as pages_router
 
 
 # 创建FastAPI应用
@@ -38,6 +39,7 @@ except Exception as e:
 
 # 注册API路由
 app.include_router(chat_router)
+app.include_router(pages_router)
 
 # WebSocket路由
 @app.websocket("/ws/{session_id}")
@@ -62,30 +64,21 @@ async def get_plugins():
         "total": len(plugin_manager.plugins)
     }
 
-# 测试页面
+# 根路径重定向到聊天页面
 @app.get("/")
 async def root():
-    return {
-        "message": "Geo-Agent API",
-        "version": "0.1.0",
-        "endpoints": {
-            "websocket": "/ws",
-            "chat_stream": "/api/chat/stream",
-            "chat": "/api/chat",
-            "health": "/health",
-            "plugins": "/plugins",
-            "test_page": "/static/test_chat.html"
-        }
-    }
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/chat")
 
 # 启动事件
 @app.on_event("startup")
 async def startup_event():
     logger.info("Geo-Agent 服务启动中...")
     logger.info(f"服务地址: http://{settings.host}:{settings.port}")
+    logger.info(f"聊天页面: http://{settings.host}:{settings.port}/chat")
     logger.info(f"WebSocket地址: ws://{settings.host}:{settings.port}/ws")
     logger.info(f"聊天API地址: http://{settings.host}:{settings.port}/api/chat/stream")
-    logger.info(f"测试页面: http://{settings.host}:{settings.port}/static/test_chat.html")
+    logger.info(f"测试页面: http://{settings.host}:{settings.port}/test")
 
 # 关闭事件
 @app.on_event("shutdown")

@@ -1,11 +1,9 @@
 """
 AI引擎模块 - 负责意图解析和自然语言理解
-支持多种AI模型：OpenAI、Qwen-Flash等
+使用Qwen-Flash模型进行自然语言处理
 """
 import json
-import httpx
-from typing import Dict, Any, Optional
-from abc import abstractmethod
+from typing import Dict, Any
 from openai import OpenAI
 from loguru import logger
 
@@ -13,58 +11,23 @@ from app.config import settings
 from app.models.message import IntentResult, IntentType
 
 
-class BaseAIProvider:
-    """AI提供商基类"""
-    
-    @abstractmethod
-    async def call_model(self, prompt: str, system_prompt: str = None) -> str:
-        """调用AI模型"""
-        pass
-
-
-class OpenAIProvider(BaseAIProvider):
-    """OpenAI提供商"""
+class QwenAIProvider:
+    """Qwen AI提供商"""
     
     def __init__(self):
-        self.client = OpenAI(
-            api_key=settings.openai_api_key,
-            base_url=settings.openai_base_url
-        )
-        self.model = settings.openai_model
-    
-    async def call_model(self, prompt: str, system_prompt: str = None) -> str:
-        """调用OpenAI模型"""
-        try:
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
-            
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=messages,
-                temperature=0.1,
-                max_tokens=500
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            logger.error(f"OpenAI API调用失败: {str(e)}")
-            raise
-
-
-class QwenProvider(BaseAIProvider):
-    """Qwen提供商"""
-    
-    def __init__(self):
+        if not settings.qwen_api_key:
+            raise ValueError("Qwen API Key未配置")
+        
         self.api_key = settings.qwen_api_key
         self.model = settings.qwen_model
-        self.base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        self.base_url = settings.qwen_base_url
         
-        # 初始化OpenAI客户端
+        # 初始化OpenAI兼容客户端
         self.client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url
         )
+        logger.info(f"初始化Qwen模型: {self.model}")
     
     async def call_model(self, prompt: str, system_prompt: str = None) -> str:
         """调用Qwen模型"""
@@ -91,7 +54,7 @@ class AIEngine:
     """AI意图解析引擎"""
     
     def __init__(self):
-        self.provider = self._get_provider()
+        self.provider = QwenAIProvider()
         
         # 意图解析的Prompt模板
         self.intent_prompt = """
@@ -123,21 +86,6 @@ class AIEngine:
 """
         
         self.system_prompt = "你是一个专业的地理信息助手，请严格按照JSON格式返回结果。"
-    
-    def _get_provider(self) -> BaseAIProvider:
-        """获取AI提供商"""
-        if settings.ai_provider.lower() == "qwen":
-            if not settings.qwen_api_key:
-                raise ValueError("Qwen API Key未配置")
-            logger.info("使用Qwen-Flash模型")
-            return QwenProvider()
-        elif settings.ai_provider.lower() == "openai":
-            if not settings.openai_api_key:
-                raise ValueError("OpenAI API Key未配置")
-            logger.info("使用OpenAI模型")
-            return OpenAIProvider()
-        else:
-            raise ValueError(f"不支持的AI提供商: {settings.ai_provider}")
     
     async def parse_intent(self, user_input: str, session_id: str) -> IntentResult:
         """解析用户意图"""

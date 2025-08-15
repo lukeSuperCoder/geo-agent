@@ -33,7 +33,7 @@ class ChatResponse(BaseModel):
 
 @router.post("/stream")
 async def stream_chat(request: ChatRequest):
-    """流式聊天接口 - 真正的流式输出"""
+    """流式聊天接口"""
     try:
         # 生成消息ID
         message_id = str(uuid.uuid4())
@@ -62,7 +62,8 @@ async def stream_chat(request: ChatRequest):
                         chunk_data = {
                             "type": "stream_chunk", 
                             "message_id": message_id, 
-                            "chunk": response["chunk"]
+                            "chunk": response["chunk"],
+                            "session_id": session_id
                         }
                         chunk_str = f"data: {json.dumps(chunk_data, ensure_ascii=False)}\n\n"
                         yield chunk_str
@@ -87,7 +88,8 @@ async def stream_chat(request: ChatRequest):
                         error_data = {
                             "type": "error", 
                             "message_id": message_id, 
-                            "error": response["error"]
+                            "error": response["error"],
+                            "session_id": session_id
                         }
                         yield f"data: {json.dumps(error_data, ensure_ascii=False)}\n\n"
                         break
@@ -121,42 +123,3 @@ async def stream_chat(request: ChatRequest):
     except Exception as e:
         logger.error(f"聊天接口错误: {str(e)}")
         raise HTTPException(status_code=500, detail=f"聊天服务出错: {str(e)}")
-
-
-@router.post("/")
-async def chat(request: ChatRequest):
-    """普通聊天接口（非流式）"""
-    try:
-        session_id = request.session_id or str(uuid.uuid4())
-        message_id = str(uuid.uuid4())
-        
-        # 收集完整的响应内容
-        full_content = ""
-        async for response in stream_chat_service.stream_chat(request.message, session_id):
-            if response["type"] == "stream_chunk":
-                full_content += response["chunk"]
-            elif response["type"] == "error":
-                raise HTTPException(status_code=500, detail=response["error"])
-        
-        return ChatResponse(
-            message_id=message_id,
-            session_id=session_id,
-            content=full_content,
-            status="success"
-        )
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"聊天接口错误: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"聊天服务出错: {str(e)}")
-
-
-@router.get("/health")
-async def chat_health():
-    """聊天服务健康检查"""
-    return {
-        "status": "healthy",
-        "service": "chat-api",
-        "provider": "qwen"  # 可以根据配置动态返回
-    } 

@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geo-Agent 智能助手</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --accent-color: #f093fb;
+            --text-primary: #2c3e50;
+            --text-secondary: #7f8c8d;
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --border-color: #e9ecef;
+            --success-color: #2ed573;
+            --error-color: #ff4757;
+            --warning-color: #ffa502;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--text-primary);
+        }
+
+        .chat-app {
+            width: 95%;
+            max-width: 1200px;
+            height: 90vh;
+            background: var(--bg-primary);
+            border-radius: 24px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 24px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            width: 48px;
+            height: 48px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .header-info h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .header-info p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--error-color);
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.connected {
+            background: var(--success-color);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .chat-main {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
+        .chat-sidebar {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .sidebar-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .quick-actions {
+            padding: 20px;
+            flex: 1;
+        }
+
+        .action-item {
+            background: white;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .action-item:hover {
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        }
+
+        .action-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+        }
+
+        .action-text {
+            flex: 1;
+        }
+
+        .action-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .action-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+            background: var(--bg-primary);
+        }
+
+        .message {
+            margin-bottom: 24px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            animation: fadeInUp 0.3s ease;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: white;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+
+        .message.user .message-avatar {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+
+        .message.assistant .message-avatar {
+            background: linear-gradient(135deg, var(--accent-color), #f5576c);
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 16px 20px;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+
+        .message.user .message-content {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border-bottom-right-radius: 6px;
+        }
+
+        .message.assistant .message-content {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-bottom-left-radius: 6px;
+        }
+
+        .message.assistant .message-content.streaming {
+            border-left: 4px solid var(--primary-color);
+            background: linear-gradient(90deg, var(--bg-secondary) 0%, rgba(102, 126, 234, 0.05) 100%);
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            text-align: right;
+        }
+
+        .message.user .message-time {
+            text-align: left;
+        }
+
+        .chat-input-area {
+            padding: 24px;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border-color);
+        }
+
+        .input-container {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+            background: var(--bg-secondary);
+            border-radius: 20px;
+            padding: 8px;
+            border: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .input-container:focus-within {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.1);
+        }
+
+        .chat-input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 12px 16px;
+            font-size: 16px;
+            outline: none;
+            resize: none;
+            min-height: 24px;
+            max-height: 120px;
+            line-height: 1.5;
+        }
+
+        .chat-input::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .send-button {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            border: none;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            flex-shrink: 0;
+        }
+
+        .send-button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .send-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 16px 20px;
+            background: var(--bg-secondary);
+            border-radius: 18px;
+            border: 1px solid var(--border-color);
+            margin-bottom: 24px;
+            border-bottom-left-radius: 6px;
+            max-width: 70%;
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--primary-color);
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 16px 20px;
+            border-radius: 12px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: var(--success-color);
+        }
+
+        .notification.error {
+            background: var(--error-color);
+        }
+
+        .notification.warning {
+            background: var(--warning-color);
+        }
+
+        .chat-messages::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-messages::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 3px;
+        }
+
+        .chat-messages::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+
+        @media (max-width: 768px) {
+            .chat-app {
+                width: 100%;
+                height: 100vh;
+                border-radius: 0;
+            }
+
+            .chat-sidebar {
+                display: none;
+            }
+
+            .chat-header {
+                padding: 16px 20px;
+            }
+
+            .header-info h1 {
+                font-size: 20px;
+            }
+
+            .chat-messages {
+                padding: 16px;
+            }
+
+            .chat-input-area {
+                padding: 16px;
+            }
+
+            .message-content {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-app">
+        <div class="chat-header">
+            <div class="header-left">
+                <div class="logo">
+                    <i class="fas fa-map-marked-alt"></i>
+                </div>
+                <div class="header-info">
+                    <h1>Geo-Agent 智能助手</h1>
+                    <p>专业的地理信息助手，为您提供智能服务</p>
+                </div>
+            </div>
+            <div class="status-indicator">
+                <div class="status-dot" id="statusDot"></div>
+                <span id="statusText">准备就绪</span>
+            </div>
+        </div>
+
+        <div class="chat-main">
+            <div class="chat-sidebar">
+                <div class="sidebar-header">
+                    <div class="sidebar-title">快速操作</div>
+                    <div class="sidebar-subtitle">点击快速开始对话</div>
+                </div>
+                <div class="quick-actions">
+                    <div class="action-item" data-action="weather">
+                        <div class="action-icon">
+                            <i class="fas fa-cloud-sun"></i>
+                        </div>
+                        <div class="action-text">
+                            <div class="action-title">天气查询</div>
+                            <div class="action-desc">查询各地天气信息</div>
+                        </div>
+                    </div>
+                    <div class="action-item" data-action="poi">
+                        <div class="action-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="action-text">
+                            <div class="action-title">POI搜索</div>
+                            <div class="action-desc">搜索兴趣点和地点</div>
+                        </div>
+                    </div>
+                    <div class="action-item" data-action="route">
+                        <div class="action-icon">
+                            <i class="fas fa-route"></i>
+                        </div>
+                        <div class="action-text">
+                            <div class="action-title">路线规划</div>
+                            <div class="action-desc">规划最佳出行路线</div>
+                        </div>
+                    </div>
+                    <div class="action-item" data-action="geography">
+                        <div class="action-icon">
+                            <i class="fas fa-globe-asia"></i>
+                        </div>
+                        <div class="action-text">
+                            <div class="action-title">地理知识</div>
+                            <div class="action-desc">了解地理相关信息</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-area">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message assistant">
+                        <div class="message-avatar">AI</div>
+                        <div class="message-content">
+                            你好！我是 Geo-Agent 智能助手，专门为您提供地理信息相关服务。
+                            <br><br>
+                            🌍 我可以帮您：
+                            <br>• 查询全国各地的天气信息
+                            <br>• 搜索附近的餐厅、酒店、景点等
+                            <br>• 提供地理建议和路线规划
+                            <br>• 回答地理相关问题
+                            <br><br>
+                            请告诉我您需要什么帮助？
+                        </div>
+                        <div class="message-time" id="welcomeTime"></div>
+                    </div>
+                </div>
+
+                <div class="typing-indicator" id="typingIndicator">
+                    <div class="typing-dots">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                </div>
+
+                <div class="chat-input-area">
+                    <div class="input-container">
+                        <textarea 
+                            class="chat-input" 
+                            id="chatInput" 
+                            placeholder="输入您的问题..."
+                            rows="1"
+                        ></textarea>
+                        <button class="send-button" id="sendButton">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notificationContainer"></div>
+
+    <script>
+        class ModernChatClient {
+            constructor() {
+                this.isStreaming = false;
+                this.currentMessageId = null;
+                this.sessionId = this.generateSessionId();
+                
+                this.initElements();
+                this.initEventListeners();
+                this.updateStatus('准备就绪', true);
+                this.setWelcomeTime();
+            }
+
+            initElements() {
+                this.chatMessages = document.getElementById('chatMessages');
+                this.chatInput = document.getElementById('chatInput');
+                this.sendButton = document.getElementById('sendButton');
+                this.statusDot = document.getElementById('statusDot');
+                this.statusText = document.getElementById('statusText');
+                this.typingIndicator = document.getElementById('typingIndicator');
+                this.notificationContainer = document.getElementById('notificationContainer');
+            }
+
+            initEventListeners() {
+                this.sendButton.addEventListener('click', () => this.sendMessage());
+                
+                this.chatInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        this.sendMessage();
+                    }
+                });
+
+                this.chatInput.addEventListener('input', () => {
+                    this.chatInput.style.height = 'auto';
+                    this.chatInput.style.height = Math.min(this.chatInput.scrollHeight, 120) + 'px';
+                });
+
+                document.querySelectorAll('.action-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const action = item.dataset.action;
+                        this.handleQuickAction(action);
+                    });
+                });
+            }
+
+            setWelcomeTime() {
+                const welcomeTime = document.getElementById('welcomeTime');
+                welcomeTime.textContent = this.formatTime(new Date());
+            }
+
+            formatTime(date) {
+                return date.toLocaleTimeString('zh-CN', { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            }
+
+            updateStatus(status, connected) {
+                this.statusText.textContent = status;
+                this.statusDot.classList.toggle('connected', connected);
+            }
+
+            showNotification(message, type = 'success') {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.textContent = message;
+                
+                this.notificationContainer.appendChild(notification);
+                
+                setTimeout(() => notification.classList.add('show'), 100);
+                
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => notification.remove(), 300);
+                }, 3000);
+            }
+
+            handleQuickAction(action) {
+                const actions = {
+                    weather: '请帮我查询北京的天气情况',
+                    poi: '帮我搜索附近的餐厅',
+                    route: '请规划从北京到上海的路线',
+                    geography: '请介绍一下中国的地理特点'
+                };
+                
+                const message = actions[action];
+                if (message) {
+                    this.chatInput.value = message;
+                    this.sendMessage();
+                }
+            }
+
+            async sendMessage() {
+                const message = this.chatInput.value.trim();
+                if (!message || this.isStreaming) return;
+
+                this.addMessage(message, 'user');
+                
+                this.chatInput.value = '';
+                this.chatInput.style.height = 'auto';
+                
+                this.showTypingIndicator();
+                
+                await this.streamChat(message);
+            }
+
+            async streamChat(message) {
+                try {
+                    this.isStreaming = true;
+                    this.sendButton.disabled = true;
+                    this.updateStatus('正在连接...', false);
+
+                    const requestData = {
+                        message: message,
+                        session_id: this.sessionId,
+                        temperature: 0.7,
+                        max_tokens: 1000
+                    };
+
+                    const response = await fetch('/api/chat/stream', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Cache-Control': 'no-cache',
+                        },
+                        body: JSON.stringify(requestData)
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    this.updateStatus('流式输出中...', true);
+                    this.hideTypingIndicator();
+
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+                    let buffer = '';
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+
+                        const chunk = decoder.decode(value, { stream: true });
+                        buffer += chunk;
+
+                        const lines = buffer.split('\n');
+                        buffer = lines.pop() || '';
+
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const data = line.slice(6);
+                                if (data.trim()) {
+                                    try {
+                                        const parsed = JSON.parse(data);
+                                        this.handleStreamEvent(parsed);
+                                    } catch (e) {
+                                        console.error('解析SSE数据失败:', e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                } catch (error) {
+                    console.error('流式聊天失败:', error);
+                    this.showNotification(`请求失败: ${error.message}`, 'error');
+                    this.hideTypingIndicator();
+                    this.isStreaming = false;
+                    this.sendButton.disabled = false;
+                    this.updateStatus('连接失败', false);
+                }
+            }
+
+            handleStreamEvent(data) {
+                switch (data.type) {
+                    case 'stream_start':
+                        this.currentMessageId = data.message_id;
+                        this.addMessage('', 'assistant', true);
+                        break;
+                        
+                    case 'stream_chunk':
+                        if (data.message_id === this.currentMessageId) {
+                            const lastMessage = this.chatMessages.lastElementChild;
+                            const content = lastMessage.querySelector('.message-content');
+                            content.textContent += data.chunk;
+                            this.scrollToBottom();
+                        }
+                        break;
+                        
+                    case 'stream_end':
+                        if (data.message_id === this.currentMessageId) {
+                            const lastMessage = this.chatMessages.lastElementChild;
+                            const content = lastMessage.querySelector('.message-content');
+                            content.classList.remove('streaming');
+                            this.currentMessageId = null;
+                            this.isStreaming = false;
+                            this.sendButton.disabled = false;
+                            this.chatInput.focus();
+                            this.updateStatus('准备就绪', true);
+                        }
+                        break;
+                        
+                    case 'error':
+                        this.showNotification(data.error || '发生未知错误', 'error');
+                        this.hideTypingIndicator();
+                        this.isStreaming = false;
+                        this.sendButton.disabled = false;
+                        this.updateStatus('错误', false);
+                        break;
+                }
+            }
+
+            addMessage(content, sender, isStreaming = false) {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = `message ${sender}`;
+                
+                const avatar = document.createElement('div');
+                avatar.className = 'message-avatar';
+                avatar.textContent = sender === 'user' ? '我' : 'AI';
+                
+                const messageContent = document.createElement('div');
+                messageContent.className = 'message-content';
+                if (isStreaming) {
+                    messageContent.classList.add('streaming');
+                }
+                messageContent.textContent = content;
+                
+                const messageTime = document.createElement('div');
+                messageTime.className = 'message-time';
+                messageTime.textContent = this.formatTime(new Date());
+                
+                messageDiv.appendChild(avatar);
+                messageDiv.appendChild(messageContent);
+                messageDiv.appendChild(messageTime);
+                
+                this.chatMessages.appendChild(messageDiv);
+                this.scrollToBottom();
+            }
+
+            showTypingIndicator() {
+                this.typingIndicator.style.display = 'block';
+                this.scrollToBottom();
+            }
+
+            hideTypingIndicator() {
+                this.typingIndicator.style.display = 'none';
+            }
+
+            scrollToBottom() {
+                this.chatMessages.scrollTop = this.chatMessages.scrollHeight;
+            }
+
+            generateSessionId() {
+                return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            new ModernChatClient();
+        });
+    </script>
+</body>
+</html> 

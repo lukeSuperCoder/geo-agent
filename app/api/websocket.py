@@ -1,6 +1,6 @@
 """
 WebSocket API处理模块
-支持流式聊天和地图联动
+支持流式聊天
 """
 import json
 import uuid
@@ -8,8 +8,6 @@ from typing import Dict, Set
 from fastapi import WebSocket, WebSocketDisconnect
 from loguru import logger
 
-from app.models.message import UserMessage, MessageType
-from app.services.chat_service import chat_service
 from app.services.stream_chat_service import stream_chat_service
 
 
@@ -52,12 +50,6 @@ class WebSocketManager:
             except Exception as e:
                 logger.error(f"发送消息失败: {str(e)}")
                 self.disconnect(connection_id, "")
-    
-    async def send_to_session(self, session_id: str, message: dict):
-        """发送消息到会话的所有连接"""
-        if session_id in self.session_connections:
-            for connection_id in self.session_connections[session_id].copy():
-                await self.send_message(connection_id, message)
 
 
 # 全局WebSocket管理器
@@ -70,7 +62,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = None):
         session_id = str(uuid.uuid4())
     
     await websocket_manager.connect(websocket, session_id)
-    connection_id = None
     
     try:
         # 发送连接成功消息
@@ -87,30 +78,18 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = None):
                 data = await websocket.receive_text()
                 message_data = json.loads(data)
                 
-                # 找到当前连接ID
-                for cid, ws in websocket_manager.active_connections.items():
-                    if ws == websocket:
-                        connection_id = cid
-                        break
-                
-                # 处理不同类型的消息
+                # 处理聊天消息
                 message_type = message_data.get("type", "")
                 
                 if message_type == "chat":
                     # 流式聊天消息
                     await handle_stream_chat(websocket, message_data, session_id)
-                    
-                elif message_type == "user_input":
-                    # 传统意图解析消息
-                    user_message = UserMessage(
-                        message=message_data["message"],
-                        session_id=session_id
-                    )
-                    
-                    # 处理消息并发送响应
-                    responses = await chat_service.process_message(user_message)
-                    for response in responses:
-                        await websocket_manager.send_message(connection_id, response)
+                else:
+                    await websocket.send_text(json.dumps({
+                        "type": "error",
+                        "error": "不支持的消息类型",
+                        "session_id": session_id
+                    }))
                 
             except json.JSONDecodeError:
                 await websocket.send_text(json.dumps({
@@ -123,9 +102,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str = None):
         logger.info(f"WebSocket连接断开: {session_id}")
     except Exception as e:
         logger.error(f"WebSocket处理错误: {str(e)}")
-    finally:
-        if connection_id:
-            websocket_manager.disconnect(connection_id, session_id)
 
 
 async def handle_stream_chat(websocket: WebSocket, message_data: dict, session_id: str):

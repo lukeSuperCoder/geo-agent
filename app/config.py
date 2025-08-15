@@ -8,16 +8,10 @@ from typing import Optional
 class Settings(BaseSettings):
     """应用配置类"""
     
-    # AI模型配置
-    ai_provider: str = "openai"  # openai, qwen, anthropic
-    openai_api_key: Optional[str] = None
-    openai_model: str = "gpt-4o-mini"
-    openai_base_url: Optional[str] = None
-    
-    # Qwen配置
-    qwen_api_key: Optional[str] = None
-    qwen_model: str = "qwen-flash"
-    qwen_base_url: Optional[str] = None
+    # AI模型配置 - 只使用阿里云百炼API
+    dashscope_api_key: Optional[str] = None
+    dashscope_model: Optional[str] = None
+    dashscope_base_url: Optional[str] = None
     
     # 服务器配置
     host: str = "0.0.0.0"
